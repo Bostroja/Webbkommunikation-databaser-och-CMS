@@ -1,15 +1,27 @@
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-PORT=8060
+PORT=8063
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/")
 def hello():
-    return { "message": "Hello FastAPI" }
+    msg = "Några populära SOA-implementationer"
+    soa_protocols = ["SOAP", "REST", "GraphQL", "gRPC" ]
+    my_dict = {
+        'message' : msg,
+        'myList' : soa_protocols
+    }
+    return my_dict
+
+#rooms = []
+
+#@app.get("/rooms")
+#def getIp(request: Request):
+#    return rooms
 
 if __name__ == "__main__":
     uvicorn.run(
