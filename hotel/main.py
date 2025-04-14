@@ -3,6 +3,8 @@ from psycopg.rows import dict_row
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from datetime import date
 
 PORT=8065
 
@@ -10,12 +12,19 @@ PORT=8065
 load_dotenv()
 DB_URL = os.getenv("DB_URL")
 
-print(DB_URL)
+#print(DB_URL)
 #Create DB connection
 conn = psycopg.connect(DB_URL, autocommit=True, row_factory=dict_row)
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# datamodell som ska valideras
+class Booking(BaseModel):
+    guest_id: int
+    room_id: int
+    datefrom: date # kräver: from datetime import date
+    dateto: date
 
 @app.get("/temp")
 def temp():
@@ -24,29 +33,84 @@ def temp():
         messages =cur.fetchall()
         return messages
 
-# "List of dicts" är ungefär samma som en "array of objects" (i JS)
-rooms = [
-    {"number": 303, "type": "single", "price": 150},
-    {"number": 404, "type": "double", "price": 200},
-    {"number": 505, "type": "suite", "price": 249.99}
-]
+# Get all guests
+@app.get("/guests")
+def get_guests():
+       with conn.cursor() as cur:
+        cur.execute("""SELECT 
+            *,
+            (SELECT count (*) 
+                FROM hotel_bookings 
+                WHERE guest_id = hotel_guests.id) AS visits
+        FROM hotel_guests 
+        ORDER BY name""")
+        guests =cur.fetchall()
+        return guests
+
 # Get all rooms
 @app.get("/rooms")
 def get_rooms():
-   return rooms
+       with conn.cursor() as cur:
+        cur.execute("""SELECT *
+        FROM hotel_rooms 
+        ORDER BY room_number""")
+        rooms =cur.fetchall()
+        return rooms
 
 # Get one room 
 @app.get("/rooms/{id}")
 def get_one_room(id: int):
-    try:
-        return rooms[id]
-    except:
-        return {"error": "Room not found " }
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM hotel_rooms WHERE id = %s", [id])
+        #cur.execute("SELECT * FROM hotel_rooms WHERE id = %s", (id,)) #tuple
+        #cur.execute("SELECT * FROM hotel_rooms WHERE id = %(id)s", {"id": id})
+        room = cur.fetchone()
+        if not room:
+            return { "msg": "Room not found"}
+        return room
+
+#Get all bookings 
+@app.get("/bookings")
+def get_bookings():
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT  
+                hb.*,
+                (hb.dateto - hb.datefrom +1) AS nights,
+                hr.room_number,
+                hr.price AS price_per_night,
+                (hb.dateto - hb.datefrom+1)*hr.price AS total_price,
+                hg.name AS guest_name
+            FROM hotel_bookings hb
+            INNER JOIN hotel_rooms hr 
+                ON hr.id = hb.room_id
+            INNER JOIN hotel_guests hg 
+                ON hg.id = hb.guest_id
+                ORDER BY hb.id DESC""")
+        bookings = cur.fetchall()
+        return bookings
 
 #Create booking 
 @app.post("/bookings")
-def create_booking(request: Request):
-    return {"msg": "booking created!"}
+def create_booking(booking: Booking):
+    with conn.cursor() as cur:
+        cur.execute("""INSERT INTO hotel_bookings (
+            guest_id,
+            room_id,
+            datefrom,
+            dateto
+        ) VALUES (
+            %s, %s, %s, %s
+        ) RETURNING id
+        """,[
+            booking.guest_id,
+            booking.room_id, 
+            booking.datefrom, 
+            booking.dateto
+        ])
+        new_id = cur.fetchone()['id']
+
+    return {"msg": "booking created!", "id": new_id}
 
 
 

@@ -7,6 +7,21 @@ PORT=8063
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# if-sats i py
+@app.get("/if/{user_input}")
+def if_test(user_input: str):
+    message = None # None är samma som null i andra språk
+
+    if user_input == "hello" or user_input == "hi":
+        message = user_input + " yourself!" # konkatenering med +
+    elif user_input == "goodbye" or user_input == "bye":
+        message = "bye bye"
+    else:
+        message = f"I don't understand! {user_input}"
+        #jämför JS backtick: ´I don't understand ${user_input}´ 
+    return { "msg": message }
+
+    
 @app.get("/")
 def hello():
     msg = "Några populära SOA-implementationer"
