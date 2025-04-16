@@ -24,5 +24,7 @@ CREATE TABLE "public"."hotel_guests" (
   CONSTRAINT "PK_hotel_guests" PRIMARY KEY ("id")
 );
 
-ALTER TABLE "public"."hotel_bookings" ADD CONSTRAINT "guest_key" FOREIGN KEY ("guest_id") REFERENCES "public"."hotel_guests" ("id");
-ALTER TABLE "public"."hotel_bookings" ADD CONSTRAINT "room_key" FOREIGN KEY ("room_id") REFERENCES "public"."hotel_rooms" ("id");
+ALTER TABLE "public"."hotel_bookings" ADD CONSTRAINT "guest_key" FOREIGN KEY ("guest_id") 
+REFERENCES "public"."hotel_guests" ("id");
+ALTER TABLE "public"."hotel_bookings" ADD CONSTRAINT "room_key" FOREIGN KEY ("room_id") 
+REFERENCES "public"."hotel_rooms" ("id");

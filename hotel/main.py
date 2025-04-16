@@ -1,10 +1,12 @@
 import os, uvicorn, psycopg
 from psycopg.rows import dict_row
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from datetime import date
+from typing import Optional
+from datetime import date, timedelta
+from markupsafe import escape
 
 PORT=8065
 
@@ -21,10 +23,23 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 
 # datamodell som ska valideras
 class Booking(BaseModel):
-    guest_id: int
     room_id: int
     datefrom: date # kräver: from datetime import date
-    dateto: date
+    dateto: Optional[date] = None
+    addinfo: Optional[str] = ""
+
+#Funktion för att validera API-key.
+def validate_key(api_key: str = ""):
+    if not api_key:
+        raise HTTPException(status_code=401, detail={"error":"api_key missing!"})
+    with conn.cursor() as cur:
+        cur.execute("""SELECT * FROM hotel_guests WHERE api_key = %s""", [api_key])
+        guest = cur.fetchone()
+        if not guest:
+            raise HTTPException(status_code=401, detail={"error":"Bad API key!"})
+        print(f"Valid key, guest {guest['id']}, {guest['name']} ")
+        return guest
+
 
 @app.get("/temp")
 def temp():
@@ -32,20 +47,6 @@ def temp():
         cur.execute("SELECT * FROM messages")
         messages =cur.fetchall()
         return messages
-
-# Get all guests
-@app.get("/guests")
-def get_guests():
-       with conn.cursor() as cur:
-        cur.execute("""SELECT 
-            *,
-            (SELECT count (*) 
-                FROM hotel_bookings 
-                WHERE guest_id = hotel_guests.id) AS visits
-        FROM hotel_guests 
-        ORDER BY name""")
-        guests =cur.fetchall()
-        return guests
 
 # Get all rooms
 @app.get("/rooms")
@@ -69,9 +70,9 @@ def get_one_room(id: int):
             return { "msg": "Room not found"}
         return room
 
-#Get all bookings 
+#Get bookings for current guest
 @app.get("/bookings")
-def get_bookings():
+def get_bookings(guest: dict = Depends(validate_key)):
     with conn.cursor() as cur:
         cur.execute("""
             SELECT  
@@ -86,27 +87,30 @@ def get_bookings():
                 ON hr.id = hb.room_id
             INNER JOIN hotel_guests hg 
                 ON hg.id = hb.guest_id
-                ORDER BY hb.id DESC""")
+            WHERE hb.guest.id = %s
+                ORDER BY hb.id DESC""", [guest['id']])
         bookings = cur.fetchall()
         return bookings
 
 #Create booking 
 @app.post("/bookings")
-def create_booking(booking: Booking):
+def create_booking(booking: Booking, guest: dict = Depends(validate_key)):
     with conn.cursor() as cur:
         cur.execute("""INSERT INTO hotel_bookings (
             guest_id,
             room_id,
             datefrom,
             dateto
+            addinfo
         ) VALUES (
-            %s, %s, %s, %s
+            %s, %s, %s, %s, %s
         ) RETURNING id
         """,[
-            booking.guest_id,
+            guest['id'],
             booking.room_id, 
             booking.datefrom, 
-            booking.dateto
+            booking.dateto or booking.datefrom + timedelta(days=1) ,
+            escape(booking.addinfo)
         ])
         new_id = cur.fetchone()['id']
 
