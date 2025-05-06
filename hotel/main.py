@@ -3,7 +3,7 @@ from psycopg.rows import dict_row
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, conint
 from typing import Optional
 from datetime import date, timedelta
 from markupsafe import escape
@@ -27,6 +27,9 @@ class Booking(BaseModel):
     datefrom: date # kräver: from datetime import date
     dateto: Optional[date] = None
     addinfo: Optional[str] = ""
+
+class BookingUpdate(BaseModel):
+    stars: conint(ge=1, le=5)
 
 #Funktion för att validera API-key.
 def validate_key(api_key: str = ""):
@@ -77,17 +80,17 @@ def get_bookings(guest: dict = Depends(validate_key)):
         cur.execute("""
             SELECT  
                 hb.*,
-                (hb.dateto - hb.datefrom +1) AS nights,
+                (hb.dateto - hb.datefrom) AS nights,
                 hr.room_number,
-                hr.price AS price_per_night,
-                (hb.dateto - hb.datefrom+1)*hr.price AS total_price,
+                hr.price as price_per_night,
+                (hb.dateto - hb.datefrom) * hr.price AS total_price,
                 hg.name AS guest_name
             FROM hotel_bookings hb
             INNER JOIN hotel_rooms hr 
                 ON hr.id = hb.room_id
             INNER JOIN hotel_guests hg 
                 ON hg.id = hb.guest_id
-            WHERE hb.guest.id = %s
+            WHERE hb.guest_id = %s
                 ORDER BY hb.id DESC""", [guest['id']])
         bookings = cur.fetchall()
         return bookings
@@ -100,7 +103,7 @@ def create_booking(booking: Booking, guest: dict = Depends(validate_key)):
             guest_id,
             room_id,
             datefrom,
-            dateto
+            dateto,
             addinfo
         ) VALUES (
             %s, %s, %s, %s, %s
@@ -113,11 +116,21 @@ def create_booking(booking: Booking, guest: dict = Depends(validate_key)):
             escape(booking.addinfo)
         ])
         new_id = cur.fetchone()['id']
-
     return {"msg": "booking created!", "id": new_id}
 
 
-
+# Update booking
+@app.put("/bookings/{id}")
+def update_bookings(id: int, booking: Booking, guest: dict = Depends(validate_key)):
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE hotel_bookings SET 
+                stars = %s, 
+                updated_at = now()
+            WHERE id = %s
+            AND guest_id = %s
+        """, [booking.stars, id, guest['id']])
+        return{ "msg": "booking updated!"}
 
 
 if __name__ == "__main__":

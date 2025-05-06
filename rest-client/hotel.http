@@ -7,7 +7,7 @@ GET {{apiUrl}}/temp
 GET {{apiUrl}}/rooms
 
 ###
-GET {{apiUrl}}/0
+GET {{apiUrl}}/rooms/0
 
 ###
 POST {{apiUrl}}/bookings
@@ -18,4 +18,12 @@ Content-Type: application/json
     "room_id": 4,
     "datefrom": "2025-05-01",
     "dateto": "2025-05-02"
+}
+
+###
+PUT {{apiUrl}}/bookings/8?api_key=62f7388f3abaa1cd9c2482ef1ae26cbb089b351a
+Content-Type: application/json
+
+{
+    "stars": 3
 }

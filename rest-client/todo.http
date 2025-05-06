@@ -1,0 +1,31 @@
+@apiUrl = http://vm4430.kaj.pouta.csc.fi:8066
+
+### GET all todos
+GET {{apiUrl}}/todos
+Content-Type: application/json
+api_key: 1111-AAAA-BBBB
+
+###
+
+### POST create new todo
+POST {{apiUrl}}/todos
+Content-Type: application/json
+
+{
+  "title": "Buy milk",
+  "category_id": 1,
+  "user_id": 1
+}
+
+###
+
+### PUT update todo with ID = 2
+PUT {{apiUrl}}/todos/2
+Content-Type: application/json
+
+{
+  "title": "Updated title",
+  "done": true
+}
+
+DELETE {{apiUrl}}/todos/3
